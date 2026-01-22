@@ -12,10 +12,6 @@ import streamlit as st
 llm = Ollama(model="llama3.2", temperature=0)
 
 
-def cot_stream(tool_name: str, reasoning: str):
-    """Helper to display tool reasoning in the Streamlit UI."""
-    with st.status(f"Tool: {tool_name}", expanded=False):
-        st.write(f"**Thinking:** {reasoning}")
 
 @tool
 def detect_manager_red_flags(review: str) -> str:
