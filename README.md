@@ -8,6 +8,23 @@ Paste in a performance review, and the app will analyze whether the manager’s 
 
 ---
 
+
+## 📸 Example Output
+
+The screenshot below shows a sample run of the Streamlit application analyzing a performance review.
+
+The UI demonstrates:
+
+- **Structured decomposition** of unstructured review text into analytical sections  
+- **Tool-level reasoning visibility** via Streamlit status components  
+- **Preserved conversational context**, allowing iterative analysis  
+- Separation between **employee performance signals** and **manager behavior red flags**
+
+The content shown is illustrative and intended to demonstrate **output format and system behavior**, not to evaluate any individual.
+
+![Example Output](assets/output.png)
+
+
 ## ✨ Features
 
 * 🧠 **LLM‑powered analysis** using `llama3.2` via Ollama
