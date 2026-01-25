@@ -13,18 +13,18 @@ from langchain_core.messages import (
 )
 
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_community.document_loaders import PyPDFLoader
 
-# -------------------------
-# Page Config + Header
-# -------------------------
+
+
+
 st.set_page_config(page_title="Shitty Manager Analysis Agent", layout="centered")
 st.title("🕵️‍♂️ Shitty Manager Review Agent")
 
-# -------------------------
-# LLM & Tools
-# -------------------------
+
+
+
 model = ChatOllama(model="llama3.2", temperature=0)
 
 
@@ -98,32 +98,37 @@ def bad_manager_verdict(review: str) -> str:
 
 tools = [detect_manager_red_flags, fairness_assessment, support_vs_control, manager_competence_signal, bad_manager_verdict]
 
-# -------------------------
-# Agent & Graph
-# -------------------------
-agent = create_react_agent(model, tools)
+
+
+
+
 
 SYSTEM_PROMPT = """You are a Senior Corporate Compliance Auditor and Technical Lead Investigator.
 Your goal is to expose 'Technical Masking' and 'Administrative Sabotage'—where an incompetent manager uses vague interpersonal critiques and attendance policing to hide their own obsolescence.
 
-### CASE CONTEXT:
+Context:
+
 1. SUBJECT: Jay Patel (Low technical competence/Software Engineer; currently on protected leave).
 2. MANAGER: VP Political Appointee. NON-TECHNICAL (Cannot write code). 
 3. HYPOCRISY: Manager is habitually late to the office but criticizes Jay for 'not staying long enough.'
 4. TEAMWORK: Manager claims Jay can't work with the team, yet manager barely engages with the team themselves.
 5. ETHICS BREACH: Falsified 'Discussed' status in the review while Jay was on leave.
 
-give final verdict that if He is good or bad manager base on all facts in given context with all your reasoning.
+
+
+use tools provided to give final verdict that if Jay is good or bad manager base on all facts in given context with all your reasoning.
+
 Do not give me code, 
 """
 
+agent = create_agent(model=model, tools = tools, system_prompt = SYSTEM_PROMPT)
 class AgentState(TypedDict):
     messages: List[BaseMessage]
 
 def analysis_node(state: AgentState):
-    # Prepend system message to the conversation
-    messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
-    result = agent.invoke({"messages": messages})
+    
+    
+    result = agent.invoke({"messages": [SystemMessage(content = SYSTEM_PROMPT)] + state["messages"]})
     return {"messages": result["messages"]}
 
 workflow = StateGraph(AgentState)
@@ -132,9 +137,9 @@ workflow.set_entry_point("analysis")
 workflow.add_edge("analysis", END)
 compiled_graph = workflow.compile()
 
-# -------------------------
-# Helpers
-# -------------------------
+
+
+
 def extract_text_from_pdf(uploaded_file) -> str:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(uploaded_file.read())
@@ -144,15 +149,15 @@ def extract_text_from_pdf(uploaded_file) -> str:
     os.remove(tmp_path)
     return "\n\n".join(doc.page_content for doc in docs)
 
-# -------------------------
-# Session State
-# -------------------------
+
+
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# -------------------------
-# Sidebar
-# -------------------------
+
+
+
 with st.sidebar:
     st.subheader("📄 Upload Review")
     uploaded_pdf = st.file_uploader("PDF only", type=["pdf"], label_visibility="collapsed")
@@ -160,20 +165,20 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# -------------------------
-# UI Logic
-# -------------------------
 
-# Display history
+
+
+
+
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Handle Input
+
 input_text = None
 
 if uploaded_pdf:
-    # Process PDF only once
+    
     if not any("PDF review uploaded" in m["content"] for m in st.session_state.messages):
         with st.spinner("Extracting PDF..."):
             input_text = extract_text_from_pdf(uploaded_pdf)
@@ -187,11 +192,11 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-# Run Agent
+
 if input_text:
     with st.chat_message("assistant"):
         with st.spinner("Analyzing..."):
-            # Convert dict history to LangChain objects
+            
             history = []
             for m in st.session_state.messages:
                 if m["role"] == "user":
