@@ -1,72 +1,128 @@
-from typing import TypedDict, List
-from langchain_community.llms import Ollama
-from langchain_experimental.llms.ollama_functions import OllamaFunctions
-from langchain.tools import tool
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langgraph.graph import StateGraph, END
-from langchain.agents import create_agent
 import streamlit as st
+import tempfile
+import os
+from typing import TypedDict, List
 
+from langchain_ollama import ChatOllama
+from langchain.tools import tool
+from langchain_core.messages import (
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    AIMessage
+)
 
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import create_react_agent
+from langchain_community.document_loaders import PyPDFLoader
 
-llm = Ollama(model="llama3.2", temperature=0)
+# -------------------------
+# Page Config + Header
+# -------------------------
+st.set_page_config(page_title="Shitty Manager Analysis Agent", layout="centered")
+st.title("🕵️‍♂️ Shitty Manager Review Agent")
 
+# -------------------------
+# LLM & Tools
+# -------------------------
+model = ChatOllama(model="llama3.2", temperature=0)
 
 
 @tool
 def detect_manager_red_flags(review: str) -> str:
-    """Detect red flags indicating poor or toxic management behavior."""
-    return llm.invoke(f"Identifying language patterns that suggest blame-shifting or lack of concrete support. Analyze the review for manager red flags (vague criticism, shifting blame). Review: {review}")
+    """Detects 'DARVO' tactics, blame-shifting, and gaslighting language."""
+    prompt = (
+        "Role: Behavioral Analyst & Forensic Linguist\n"
+        "Task: Identify markers of toxic management in the review text.\n"
+        "Rubric: Look specifically for:\n"
+        "1. Blame-shifting: Does the manager blame the individual for systemic/managerial failures?\n"
+        "2. Ghost Feedback: Does the text use 'people are saying' or 'concerns were raised' without data?\n"
+        "3. Weaponized Empathy: Using phrases like 'I want you to succeed' to mask unfair criticism.\n"
+        f"Review Text: {review}"
+    )
+    return model.invoke(prompt).content
 
 @tool
 def fairness_assessment(review: str) -> str:
-    """Assess if the manager feedback is fair, justified, and proportional."""
-    return llm.invoke(f"Comparing performance claims against the timeline provided (review written during leave). Assess if feedback is FAIR or UNFAIR: {review}")
+    """Checks if criticism is grounded in reality or ignores context (like leave)."""
+    prompt = (
+        "Role: HR Compliance Auditor\n"
+        "Task: Assess if feedback is FAIR or UNFAIR.\n"
+        "Rubric: Flag as UNFAIR if the manager penalizes the employee for productivity "
+        "during protected leave or lack of resources. Identify if the 'Discussed' "
+        "status is used as a tool for falsified documentation.\n"
+        f"Review Text: {review}"
+    )
+    return model.invoke(prompt).content
 
 @tool
 def support_vs_control(review: str) -> str:
-    """Classify the manager's style as Supportive, Micromanaging, Controlling, or Neglectful."""
-    return llm.invoke(f"Evaluating the tone for signs of micromanagement vs. lack of involvement. Classify manager style (Supportive/Controlling) with reason: {review}")
+    """Maps the manager onto the Support-Autonomy Matrix."""
+    prompt = (
+        "Role: Executive Management Coach\n"
+        "Task: Classify style as SUPPORTIVE, MICROMANAGING, NEGLECTFUL, or HYPOCRITICAL.\n"
+        "Rubric: Use the Support-Autonomy framework. Specifically, look for high control "
+        "on the employee (office hours) vs. low control on self (manager's own tardiness).\n"
+        f"Review Text: {review}"
+    )
+    return model.invoke(prompt).content
+
+
 
 @tool
 def manager_competence_signal(review: str) -> str:
-    """Evaluate competence in people management."""
-    return llm.invoke(f"Checking for coaching mindset and accountability traits. Classify manager as COMPETENT or INCOMPETENT: {review}")
+    """Distinguishes between 'Coaching' and 'Policing'."""
+    prompt = (
+        "Role: Leadership Consultant\n"
+        "Task: Classify manager as COMPETENT or INCOMPETENT.\n"
+        "Rubric: Competent managers build 'bridges' (actionable steps). Incompetent "
+        "managers only point out 'gaps' and express frustration. Flag if the manager "
+        "lacks the technical depth to actually evaluate the work.\n"
+        f"Review Text: {review}"
+    )
+    return model.invoke(prompt).content
 
 @tool
 def bad_manager_verdict(review: str) -> str:
-    """Final verdict: NOT A BAD MANAGER, BORDERLINE, or BAD MANAGER."""
-    return llm.invoke(f"Synthesizing all behavioral data for a final objective rating. Provide final verdict: {review}")
+    """Synthesizes all behaviors into a final objective rating."""
+    prompt = (
+        "Role: Executive HR Director\n"
+        "Task: Provide final verdict: NOT A BAD MANAGER, BORDERLINE, or BAD MANAGER.\n"
+        "Strategy: Weigh ETHICS above all. If the meeting was falsified ('Discussed' checked "
+        "with no meeting) and the manager is hypocritical, the verdict MUST be BAD MANAGER.\n"
+        f"Review Text: {review}"
+    )
+    return model.invoke(prompt).content
+
+
 
 tools = [detect_manager_red_flags, fairness_assessment, support_vs_control, manager_competence_signal, bad_manager_verdict]
 
+# -------------------------
+# Agent & Graph
+# -------------------------
+agent = create_react_agent(model, tools)
 
+SYSTEM_PROMPT = """You are a Senior Corporate Compliance Auditor and Technical Lead Investigator.
+Your goal is to expose 'Technical Masking' and 'Administrative Sabotage'—where an incompetent manager uses vague interpersonal critiques and attendance policing to hide their own obsolescence.
 
+### CASE CONTEXT:
+1. SUBJECT: Jay Patel (Low technical competence/Software Engineer; currently on protected leave).
+2. MANAGER: VP Political Appointee. NON-TECHNICAL (Cannot write code). 
+3. HYPOCRISY: Manager is habitually late to the office but criticizes Jay for 'not staying long enough.'
+4. TEAMWORK: Manager claims Jay can't work with the team, yet manager barely engages with the team themselves.
+5. ETHICS BREACH: Falsified 'Discussed' status in the review while Jay was on leave.
 
-from langchain_ollama import ChatOllama
-
-model = ChatOllama(model="llama3.2", temperature=0)
-
-
-model_with_tools = model.bind_tools(tools)
-
-
-system_message = """You are an objective management analyst. 
-Context: Jay Patel is on leave. The manager is a VP promoted via politics. 
-Review was marked 'discussed' without a meeting. Analyze based on these facts. 
-Output ONLY the tool call when using tools. Respond in Markdown."""
-
-agent = create_agent(
-    model=model_with_tools, 
-    tools=tools, 
-    system_prompt=system_message
-)
+Analyze if He is good or bad manager base on all facts in given context.
+"""
 
 class AgentState(TypedDict):
     messages: List[BaseMessage]
 
 def analysis_node(state: AgentState):
-    result = agent.invoke(state)
+    # Prepend system message to the conversation
+    messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+    result = agent.invoke({"messages": messages})
     return {"messages": result["messages"]}
 
 workflow = StateGraph(AgentState)
@@ -75,43 +131,74 @@ workflow.set_entry_point("analysis")
 workflow.add_edge("analysis", END)
 compiled_graph = workflow.compile()
 
+# -------------------------
+# Helpers
+# -------------------------
+def extract_text_from_pdf(uploaded_file) -> str:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(uploaded_file.read())
+        tmp_path = tmp.name
+    loader = PyPDFLoader(tmp_path)
+    docs = loader.load()
+    os.remove(tmp_path)
+    return "\n\n".join(doc.page_content for doc in docs)
 
-
-st.set_page_config(page_title="Manager Analysis Agent")
-st.title("🕵️‍♂️ Shitty Manager Review")
-
+# -------------------------
+# Session State
+# -------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display all past messages
+# -------------------------
+# Sidebar
+# -------------------------
+with st.sidebar:
+    st.subheader("📄 Upload Review")
+    uploaded_pdf = st.file_uploader("PDF only", type=["pdf"], label_visibility="collapsed")
+    if st.button("Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
+
+# -------------------------
+# UI Logic
+# -------------------------
+
+# Display history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# Handle Input
+input_text = None
 
-user_input = st.chat_input("Paste review text and press Enter...")
+if uploaded_pdf:
+    # Process PDF only once
+    if not any("PDF review uploaded" in m["content"] for m in st.session_state.messages):
+        with st.spinner("Extracting PDF..."):
+            input_text = extract_text_from_pdf(uploaded_pdf)
+            st.session_state.messages.append({"role": "user", "content": f"PDF review uploaded:\n\n{input_text[:1000]}..."})
+    
 
+user_input = st.chat_input("Ask about the manager...")
 if user_input:
-
+    input_text = user_input
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-
-    with st.spinner("Thinking..."):
-     
-        initial_state = {"messages": [HumanMessage(content=user_input)]}
-        outputs = list(compiled_graph.stream(initial_state))
-
-
-    last_output = outputs[-1]
-    analysis_output = last_output.get("analysis", {})
-    
-    if analysis_output:
-        final_messages = analysis_output.get("messages", [])
-        if final_messages:
-            final_text = final_messages[-1].content
-            # Append assistant response to chat history
-            st.session_state.messages.append({"role": "assistant", "content": final_text})
-            with st.chat_message("assistant"):
-                st.markdown(final_text)
+# Run Agent
+if input_text:
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing..."):
+            # Convert dict history to LangChain objects
+            history = []
+            for m in st.session_state.messages:
+                if m["role"] == "user":
+                    history.append(HumanMessage(content=m["content"]))
+                else:
+                    history.append(AIMessage(content=m["content"]))
+            
+            result = compiled_graph.invoke({"messages": history})
+            final_response = result["messages"][-1].content
+            st.markdown(final_response)
+            st.session_state.messages.append({"role": "assistant", "content": final_response})
