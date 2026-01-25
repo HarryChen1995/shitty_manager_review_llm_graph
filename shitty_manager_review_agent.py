@@ -128,7 +128,7 @@ class AgentState(TypedDict):
 def analysis_node(state: AgentState):
     
     
-    result = agent.invoke({"messages": [SystemMessage(content = SYSTEM_PROMPT)] + state["messages"]})
+    result = agent.invoke(state)
     return {"messages": result["messages"]}
 
 workflow = StateGraph(AgentState)
