@@ -90,7 +90,7 @@ ollama pull llama3.2
 ## 📦 Installation
 
 ```bash
-pip install streamlit langchain langgraph langchain-community langchain-ollama
+pip install streamlit langchain langgraph langchain-community langchain-ollama pypdf
 ```
 
 ---
@@ -137,7 +137,6 @@ Use responsibly.
 ## 🧩 Possible Extensions
 
 * Multi‑node LangGraph (tool‑by‑tool execution)
-* Exportable PDF reports
 * Side‑by‑side review comparison
 * Manager trend analysis over time
 * Anonymization / redaction layer
