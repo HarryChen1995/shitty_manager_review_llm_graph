@@ -113,7 +113,8 @@ Your goal is to expose 'Technical Masking' and 'Administrative Sabotage'—where
 4. TEAMWORK: Manager claims Jay can't work with the team, yet manager barely engages with the team themselves.
 5. ETHICS BREACH: Falsified 'Discussed' status in the review while Jay was on leave.
 
-Analyze if He is good or bad manager base on all facts in given context.
+give final verdict that if He is good or bad manager base on all facts in given context with all your reasoning.
+Do not give me code, 
 """
 
 class AgentState(TypedDict):
